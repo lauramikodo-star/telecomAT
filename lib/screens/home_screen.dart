@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_native_ocr/flutter_native_ocr.dart';
 import '../services/algerie_telecom_api.dart';
 
 class AppState extends ChangeNotifier {
@@ -48,12 +50,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _scanVoucher() async {
-    final code = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const VoucherScanner()),
-    );
-    if (code != null && code.isNotEmpty) {
-      _voucherCtrl.text = code;
-      _showSnack('Voucher scanned');
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      final ocr = FlutterNativeOcr();
+      try {
+        String text = await ocr.recognizeText(image.path);
+        // Extract the first 16-digit number from the recognized text
+        final RegExp regExp = RegExp(r'\d{16}');
+        final Match? match = regExp.firstMatch(text);
+        if (match != null) {
+          _voucherCtrl.text = match.group(0)!;
+          _showSnack('Voucher scanned');
+        } else {
+          _showSnack('No 16-digit number found', color: Colors.red);
+        }
+      } catch (e) {
+        _showSnack('Error recognizing text: $e', color: Colors.red);
+      }
     }
   }
 
@@ -93,8 +107,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 8),
                   IconButton(
                     onPressed: _scanVoucher,
-                    icon: const Icon(Icons.qr_code_scanner),
-                    tooltip: 'Scan voucher',
+                    icon: const Icon(Icons.image_search),
+                    tooltip: 'Scan from image',
                   )
                 ],
               ),
@@ -190,22 +204,3 @@ class _InfoCard extends StatelessWidget {
   }
 }
 
-class VoucherScanner extends StatelessWidget {
-  const VoucherScanner({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Scan voucher')),
-      body: MobileScanner(
-        onDetect: (capture) {
-          final codes = capture.barcodes;
-          final code = codes.isNotEmpty ? (codes.first.rawValue ?? '') : '';
-          if (code.isNotEmpty) {
-            Navigator.of(context).pop(code);
-          }
-        },
-      ),
-    );
-  }
-}
