@@ -8,7 +8,7 @@ import '../services/gemini_api.dart';
 class AppState extends ChangeNotifier {
   final api = AlgerieTelecomApi();
   // TODO: Replace with your actual Gemini API key.
-  final geminiApi = GeminiApi("submit your api key");
+  final geminiApi = GeminiApi("YOUR_GEMINI_API_KEY");
   Map<String, dynamic>? lineInfo;
   Map<String, dynamic>? line4gInfo;
   String? lastMessage;
