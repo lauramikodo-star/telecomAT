@@ -69,6 +69,15 @@ class AlgerieTelecomApi {
     return {'found': false, 'message': adsl['message'] ?? lte['message'] ?? 'Not found'};
   }
 
+  /// Get 4G LTE line info.
+  Future<Map<String, dynamic>> get4gLineInfo(String number) async {
+    final res = await _post('voucher_internet.php', {
+      'dahabiaco20': 'Confirmer',
+      'nd_4gco20': number,
+    });
+    return res;
+  }
+
   /// Check debt for ADSL/FTTH lines. 4G returns not applicable.
   Future<Map<String, dynamic>> checkDebt(String number) async {
     final res = await _post('dette_paiement.php', {
