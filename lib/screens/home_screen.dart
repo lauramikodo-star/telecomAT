@@ -22,6 +22,13 @@ class AppState extends ChangeNotifier {
     return res;
   }
 
+  Future<Map<String, dynamic>> payIdoom(String number, String voucher) async {
+    loading = true; notifyListeners();
+    final res = await api.rechargeIdoom(number: number, voucher: voucher);
+    loading = false; notifyListeners();
+    return res;
+  }
+
   Future<Map<String, dynamic>> debt(String number) async {
     loading = true; notifyListeners();
     final res = await api.checkDebt(number);
@@ -132,6 +139,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                     icon: const Icon(Icons.payment),
                     label: const Text('Recharge'),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: state.loading ? null : () async {
+                      final n = _numberCtrl.text.trim();
+                      final v = _voucherCtrl.text.trim();
+                      if (n.isEmpty || v.isEmpty) return _showSnack('Enter number and voucher');
+                      final res = await state.payIdoom(n, v);
+                      if (res['succes'] == '1') {
+                        _showSnack('Recharge OK: ${res['num_trans'] ?? ''}', color: Colors.green);
+                      } else {
+                        _showSnack(res['message']?.toString() ?? 'Recharge failed', color: Colors.red);
+                      }
+                    },
+                    icon: const Icon(Icons.wifi_tethering),
+                    label: const Text('Recharge IDOOM'),
                   ),
                   ElevatedButton.icon(
                     onPressed: state.loading ? null : () async {

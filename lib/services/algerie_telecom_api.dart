@@ -100,4 +100,28 @@ class AlgerieTelecomApi {
     final res = await _post(endpoint, body);
     return res;
   }
+
+  /// Recharge Idoom ADSL/FTTH by voucher.
+  Future<Map<String, dynamic>> rechargeIdoom({required String number, required String voucher}) async {
+    final info = await getLineInfo(number);
+    if (info['found'] != true) {
+      return {'succes': '0', 'message': 'Line not found. Check the number.'};
+    }
+
+    // This is for ADSL/FTTH lines only
+    if (info['system'] == '4G') {
+      return {'succes': '0', 'message': 'This recharge is for ADSL/FTTH lines only.'};
+    }
+
+    final body = {
+      'rechargeco20': 'Recharger',
+      'typeco20': info['type'].toString(), // e.g. FTTH or ADSL
+      'ndco20': number,
+      'nclico20': info['ncli'].toString(),
+      'voucherco20': voucher,
+    };
+
+    final res = await _post('voucher_internet_suite.php', body);
+    return res;
+  }
 }
