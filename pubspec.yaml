@@ -36,7 +36,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: 1.5.0
   provider: 6.1.5+1
-  mobile_scanner: 6.0.2
+  flutter_native_ocr: ^0.1.0
+  image_picker: ^1.0.0
 
 dev_dependencies:
   flutter_test:
