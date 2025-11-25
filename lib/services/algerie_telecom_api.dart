@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 /// They return JSON with text/html content-type and sometimes with BOM.
 class AlgerieTelecomApi {
   static const String _base = 'https://paiement.algerietelecom.dz/AndroidApp/';
+  static const String _baseMyIdoom = 'https://myidoom.at.dz/api/checkHeader/';
 
   // Captured headers from the official app (from your screenshots)
   static const Map<String, String> _baseHeaders = {
@@ -17,10 +18,54 @@ class AlgerieTelecomApi {
     'Host': 'paiement.algerietelecom.dz',
   };
 
+    static const Map<String, String> _baseHeadersMyIdoom = {
+    'user-agent': 'Dart/3.0 (dart:io)',
+    'content-type': 'application/json; charset=utf-8',
+    'accept-encoding': 'gzip',
+    'authorization': 'Basic dXNyLW15aWRvb206TmVpZEshMTc5NA==',
+    'host': 'myidoom.at.dz',
+  };
+
   Future<Map<String, dynamic>> _post(String endpoint, Map<String, String> body) async {
     final uri = Uri.parse('$_base$endpoint');
     final res = await http.post(uri, headers: _baseHeaders, body: body).timeout(const Duration(seconds: 20));
     // Trim BOM and spaces then try decode to JSON
+    final raw = res.body;
+    final cleaned = raw.replaceAll('\uFEFF', '').trim();
+    try {
+      final jsonMap = json.decode(cleaned) as Map<String, dynamic>;
+      return jsonMap;
+    } catch (_) {
+      return {'succes': '0', 'message': 'Invalid server response', 'raw': cleaned};
+    }
+  }
+
+  Future<Map<String, dynamic>> getAccountInfo(String token) async {
+    final uri = Uri.parse('${_baseMyIdoom}compte');
+    final headers = {
+      ..._baseHeadersMyIdoom,
+      'authorization': 'Bearer $token',
+      'accept': 'application/json',
+    };
+    final res = await http.get(uri, headers: headers).timeout(const Duration(seconds: 20));
+    final raw = res.body;
+    final cleaned = raw.replaceAll('\uFEFF', '').trim();
+    try {
+      final jsonMap = json.decode(cleaned) as Map<String, dynamic>;
+      return jsonMap;
+    } catch (_) {
+      return {'succes': '0', 'message': 'Invalid server response', 'raw': cleaned};
+    }
+  }
+
+  Future<Map<String, dynamic>> login(String nd, String password) async {
+    final uri = Uri.parse('${_baseMyIdoom}login');
+    final body = json.encode({
+      'nd': nd,
+      'password': password,
+      'lang': 'fr',
+    });
+    final res = await http.post(uri, headers: _baseHeadersMyIdoom, body: body).timeout(const Duration(seconds: 20));
     final raw = res.body;
     final cleaned = raw.replaceAll('\uFEFF', '').trim();
     try {

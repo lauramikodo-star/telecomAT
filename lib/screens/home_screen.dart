@@ -13,6 +13,10 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic>? line4gInfo;
   String? lastMessage;
   bool loading = false;
+  String? _authToken;
+  Map<String, dynamic>? accountInfo;
+
+  bool get isLoggedIn => _authToken != null;
 
   Future<void> fetchInfo(String number) async {
     loading = true;
@@ -47,6 +51,25 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     return res;
   }
+
+  Future<Map<String, dynamic>> login(String number, String password) async {
+    loading = true;
+    notifyListeners();
+    final res = await api.login(number, password);
+    if (res['code'] == 0) {
+      _authToken = res['authorisation']['token'];
+      accountInfo = await api.getAccountInfo(_authToken!);
+    }
+    loading = false;
+    notifyListeners();
+    return res;
+  }
+
+  void logout() {
+    _authToken = null;
+    accountInfo = null;
+    notifyListeners();
+  }
 }
 
 class HomeScreen extends StatefulWidget {
@@ -56,8 +79,10 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tabCtrl;
   final _numberCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
   final _voucherCtrl = TextEditingController();
   final _4gNumberCtrl = TextEditingController();
 
@@ -84,8 +109,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showApiResponseDialog(Map<String, dynamic> response) {
-    final bool isSuccess = response['succes'] == '1' || response.containsKey('num_trans');
-    final String title = isSuccess ? '✅ Recharge Successful!' : '❌ Recharge Failed';
+    final bool isSuccess = response['succes'] == '1' || response.containsKey('num_trans') || response['code'] == 0;
+    final String title = isSuccess ? '✅ Successful!' : '❌ Failed';
 
     showDialog(
       context: context,
@@ -123,17 +148,127 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('AT DZ Recharge')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+      appBar: AppBar(
+        title: const Text('AT DZ Recharge'),
+        bottom: TabBar(
+          controller: _tabCtrl,
+          tabs: const [
+            Tab(text: 'Dashboard', icon: Icon(Icons.dashboard)),
+            Tab(text: 'ADSL/Fibre', icon: Icon(Icons.router)),
+            Tab(text: '4G LTE', icon: Icon(Icons.four_g_mobiledata)),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabCtrl,
+        children: [
+          _buildDashboardTab(state),
+          _buildAdslFibreTab(state),
+          _build4gLteTab(state),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardTab(AppState state) {
+    if (state.isLoggedIn) {
+      return _buildAccountInfo(state);
+    } else {
+      return _buildLoginForm(state);
+    }
+  }
+
+  Widget _buildLoginForm(AppState state) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _numberCtrl,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Phone / Line number',
+              hintText: '021.. or 05..',
+              prefixIcon: Icon(Icons.phone),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passwordCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Password',
+              prefixIcon: Icon(Icons.lock),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: state.loading
+                ? null
+                : () async {
+                    final n = _numberCtrl.text.trim();
+                    final p = _passwordCtrl.text.trim();
+                    if (n.isEmpty || p.isEmpty) {
+                      return _showSnack('Enter number and password');
+                    }
+                    final res = await state.login(n, p);
+                    if (res['code'] != 0) {
+                      _showApiResponseDialog(res);
+                    }
+                  },
+            icon: const Icon(Icons.login),
+            label: const Text('Login'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountInfo(AppState state) {
+    final info = state.accountInfo!;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Welcome, ${info['prenom']} ${info['nom']}!', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 16),
+          _InfoCard(data: info),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: state.logout,
+            icon: const Icon(Icons.logout),
+            label: const Text('Logout'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdslFibreTab(AppState state) {
+    return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
               const Text("IDOOM INTERNET (ADSL / Fibre)"),
               TextField(
                 controller: _numberCtrl,
@@ -224,44 +359,52 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 16),
               if (state.lineInfo != null) _InfoCard(data: state.lineInfo!),
-              const Divider(height: 32),
-              const Text("IDOOM 4G LTE"),
-              TextField(
-                controller: _4gNumberCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: '4G LTE Line number',
-                  hintText: '213...',
-                  prefixIcon: Icon(Icons.phone_android),
-                ),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: state.loading
-                    ? null
-                    : () async {
-                        final n = _4gNumberCtrl.text.trim();
-                        if (n.isEmpty) return _showSnack('Enter 4G number');
-                        await state.fetch4gInfo(n);
-                        final info = state.line4gInfo;
-                        if (info?['succes'] == '1') {
-                          _showSnack(
-                              'Found ${info!['type']} | NCLI: ${info['ncli']}');
-                        } else {
-                          _showSnack('Not found', color: Colors.red);
-                        }
-                      },
-                icon: const Icon(Icons.info_outline),
-                label: const Text('Get 4G LTE Info'),
-              ),
-              const SizedBox(height: 16),
-              if (state.loading) const LinearProgressIndicator(),
-              const SizedBox(height: 16),
-              if (state.line4gInfo != null)
-                _4gInfoCard(data: state.line4gInfo!),
             ],
           ),
         ),
+    );
+  }
+
+  Widget _build4gLteTab(AppState state) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text("IDOOM 4G LTE"),
+          TextField(
+            controller: _4gNumberCtrl,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: '4G LTE Line number',
+              hintText: '213...',
+              prefixIcon: Icon(Icons.phone_android),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: state.loading
+                ? null
+                : () async {
+                    final n = _4gNumberCtrl.text.trim();
+                    if (n.isEmpty) return _showSnack('Enter 4G number');
+                    await state.fetch4gInfo(n);
+                    final info = state.line4gInfo;
+                    if (info?['succes'] == '1') {
+                      _showSnack('Found ${info!['type']} | NCLI: ${info['ncli']}');
+                    } else {
+                      _showSnack('Not found', color: Colors.red);
+                    }
+                  },
+            icon: const Icon(Icons.info_outline),
+            label: const Text('Get 4G LTE Info'),
+          ),
+          const SizedBox(height: 16),
+          if (state.loading) const LinearProgressIndicator(),
+          const SizedBox(height: 16),
+          if (state.line4gInfo != null)
+            _4gInfoCard(data: state.line4gInfo!),
+        ],
       ),
     );
   }
@@ -273,7 +416,6 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (data['found'] != true) return const SizedBox.shrink();
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -283,13 +425,19 @@ class _InfoCard extends StatelessWidget {
             Row(children: [
               const Icon(Icons.account_circle),
               const SizedBox(width: 8),
-              Text('${data['system']} - ${data['type']}',
+              Text('${data['offre'] ?? data['type']}',
                   style: Theme.of(context).textTheme.titleMedium),
             ]),
             const SizedBox(height: 8),
-            Text('NCLI: ${data['ncli']}'),
-            Text('Offer: ${data['offer']}'),
-            Text('Client: ${data['client']}'),
+            if (data.containsKey('ncli')) Text('NCLI: ${data['ncli']}'),
+            if (data.containsKey('client')) Text('Client: ${data['client']}'),
+            if (data.containsKey('adresse')) Text('Address: ${data['adresse']}'),
+            if (data.containsKey('status')) Text('Status: ${data['status']}'),
+            if (data.containsKey('dette')) Text('Debt: ${data['dette']}'),
+            if (data.containsKey('credit')) Text('Credit: ${data['credit']}'),
+            if (data.containsKey('balance')) Text('Balance: ${data['balance']}'),
+            if (data.containsKey('dateexp')) Text('Expiry Date: ${data['dateexp']}'),
+            if (data.containsKey('mobile')) Text('Mobile: ${data['mobile']}'),
           ],
         ),
       ),
