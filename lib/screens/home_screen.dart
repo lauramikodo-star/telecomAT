@@ -116,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('OK'),
-          )
+          ),
         ],
       ),
     );
