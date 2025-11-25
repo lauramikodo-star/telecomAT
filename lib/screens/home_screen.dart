@@ -47,6 +47,15 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     return res;
   }
+
+  Future<Map<String, dynamic>> login(String number, String password) async {
+    loading = true;
+    notifyListeners();
+    final res = await api.login(number, password);
+    loading = false;
+    notifyListeners();
+    return res;
+  }
 }
 
 class HomeScreen extends StatefulWidget {
@@ -58,6 +67,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _numberCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
   final _voucherCtrl = TextEditingController();
   final _4gNumberCtrl = TextEditingController();
 
@@ -84,8 +94,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showApiResponseDialog(Map<String, dynamic> response) {
-    final bool isSuccess = response['succes'] == '1' || response.containsKey('num_trans');
-    final String title = isSuccess ? '✅ Recharge Successful!' : '❌ Recharge Failed';
+    final bool isSuccess = response['succes'] == '1' || response.containsKey('num_trans') || response['code'] == 0;
+    final String title = isSuccess ? '✅ Successful!' : '❌ Failed';
 
     showDialog(
       context: context,
@@ -145,6 +155,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              TextField(
+                controller: _passwordCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon: Icon(Icons.lock),
+                ),
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -186,6 +205,21 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
                     icon: const Icon(Icons.info_outline),
                     label: const Text('Line infos'),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: state.loading
+                        ? null
+                        : () async {
+                            final n = _numberCtrl.text.trim();
+                            final p = _passwordCtrl.text.trim();
+                            if (n.isEmpty || p.isEmpty) {
+                              return _showSnack('Enter number and password');
+                            }
+                            final res = await state.login(n, p);
+                            _showApiResponseDialog(res);
+                          },
+                    icon: const Icon(Icons.login),
+                    label: const Text('Login'),
                   ),
                   ElevatedButton.icon(
                     onPressed: state.loading
