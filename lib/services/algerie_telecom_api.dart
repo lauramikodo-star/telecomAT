@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 /// Algerie Telecom HTTP client for 4GLTE and ADSL/FTTH
@@ -6,6 +7,28 @@ import 'package:http/http.dart' as http;
 /// They return JSON with text/html content-type and sometimes with BOM.
 class AlgerieTelecomApi {
   static const String _base = 'https://paiement.algerietelecom.dz/AndroidApp/';
+  static const String _loginBase = 'https://myidoom.at.dz/api/checkHeader/';
+
+  Future<Map<String, dynamic>> login(String nd, String password) async {
+    final configString = await rootBundle.loadString('assets/config.json');
+    final config = json.decode(configString);
+    final authToken = config['login_auth_token'];
+
+    final uri = Uri.parse('${_loginBase}login');
+    final headers = {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Authorization': 'Basic $authToken',
+      'User-Agent': 'Dart/3.0 (dart:io)',
+      'Host': 'myidoom.at.dz',
+    };
+    final body = json.encode({
+      'nd': nd,
+      'password': password,
+      'lang': 'fr',
+    });
+    final res = await http.post(uri, headers: headers, body: body);
+    return json.decode(res.body);
+  }
 
   // Captured headers from the official app (from your screenshots)
   static const Map<String, String> _baseHeaders = {
